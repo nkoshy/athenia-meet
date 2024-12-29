@@ -66,9 +66,6 @@ jobs:
         VOLUME ["/config", "/usr/share/jitsi-meet/transcripts"]
         EOF
         
-        EXPOSE 80 443
-        VOLUME ["/config", "/usr/share/jitsi-meet/transcripts"]
-        EOF
     
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
