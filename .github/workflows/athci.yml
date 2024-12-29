@@ -32,7 +32,7 @@ jobs:
       run: |
         cat << EOF > docker-build/Dockerfile
         ARG JITSI_REPO=jitsi
-        ARG BASE_TAG=stable
+        ARG BASE_TAG=unstable-2024-12-29
         FROM \${JITSI_REPO}/base:\${BASE_TAG}
         
         LABEL org.opencontainers.image.title="Athenia AI Meet"
@@ -44,23 +44,14 @@ jobs:
         ADD https://raw.githubusercontent.com/acmesh-official/acme.sh/3.0.7/acme.sh /opt
         COPY rootfs/ /
         COPY *.deb /tmp/
-        ENV DEBIAN_FRONTEND=noninteractive
-        
-        # Update and install dependencies
-        RUN apt-get update
-        RUN apt-get install -y dnsutils cron nginx-extras socat curl jq
-        
-        # Install our custom deb package
-        COPY *.deb /tmp/
-        RUN dpkg -i /tmp/*.deb || true
-        RUN apt-get install -f -y
-        
-        # Configure and cleanup
-        RUN mv /usr/share/jitsi-meet/interface_config.js /defaults && \
+        RUN apt-dpkg-wrap apt-get update && \
+            apt-dpkg-wrap apt-get install -y dnsutils cron nginx-extras socat curl jq && \
+            dpkg -i /tmp/*.deb && \
+            apt-dpkg-wrap apt-get install -f && \
+            mv /usr/share/jitsi-meet/interface_config.js /defaults && \
             rm -f /etc/nginx/conf.d/default.conf && \
             rm -f /tmp/*.deb && \
-            apt-get clean && \
-            rm -rf /var/lib/apt/lists/*
+            apt-cleanup
         
         EXPOSE 80 443
         VOLUME ["/config", "/usr/share/jitsi-meet/transcripts"]
