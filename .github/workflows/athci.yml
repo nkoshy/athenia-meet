@@ -1,0 +1,48 @@
+name: Debian Package Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debian-build:
+    name: Build Debian Package
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - uses: actions/setup-node@v4
+      with:
+        node-version-file: '.nvmrc'
+        cache: 'npm'
+    
+    - name: Check Node / npm versions
+      run: |
+        node -v
+        npm -v
+    
+    - name: Install npm dependencies
+      run: npm install
+    
+    - name: Run make
+      run: make
+    
+    - name: Install Debian build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y debhelper devscripts build-essential
+    
+    - name: Build Debian package
+      run: |
+        # Build the Debian package
+        dpkg-buildpackage -b -rfakeroot -us -uc
+        # Move the .deb files up one directory
+        mv ../*.deb .
+    
+    - name: Upload Debian package
+      uses: actions/upload-artifact@v4
+      with:
+        name: debian-packages
+        path: |
+          ./*.deb
+          ./*.changes
+          ./*.buildinfo
