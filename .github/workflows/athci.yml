@@ -15,36 +15,18 @@ jobs:
         node-version-file: '.nvmrc'
         cache: 'npm'
     
-    - name: Check Node / npm versions
-      run: |
-        node -v
-        npm -v
-    
-    - name: Install build dependencies
+    - name: Build Debian package
       run: |
         sudo apt-get update
         sudo apt-get install -y debhelper devscripts build-essential
-    
-    - name: Install npm dependencies
-      run: npm install
-    
-    - name: Run make
-      run: make
-    
-    - name: Build Debian package
-      run: |
+        npm install
+        make
         dpkg-buildpackage -b -rfakeroot -us -uc
         mkdir -p docker-build
         mv ../*.deb docker-build/
     
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Login to DockerHub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Copy rootfs
+      run: cp -r rootfs docker-build/
     
     - name: Create Dockerfile
       run: |
@@ -61,31 +43,36 @@ jobs:
         
         ADD https://raw.githubusercontent.com/acmesh-official/acme.sh/3.0.7/acme.sh /opt
         COPY rootfs/ /
-        
-        # Copy the locally built deb package
         COPY *.deb /tmp/
         
-        RUN apt-dpkg-wrap apt-get update && \
-            apt-dpkg-wrap apt-get install -y dnsutils cron nginx-extras socat curl jq && \
+        # Install dependencies
+        RUN export DEBIAN_FRONTEND=noninteractive && \
+            apt-get update && \
+            apt-get install -y dnsutils cron nginx-extras socat curl jq && \
             dpkg -i /tmp/*.deb && \
-            apt-dpkg-wrap apt-get install -f && \
+            apt-get install -f -y && \
             mv /usr/share/jitsi-meet/interface_config.js /defaults && \
             rm -f /etc/nginx/conf.d/default.conf && \
             rm -f /tmp/*.deb && \
-            apt-cleanup
+            apt-get clean && \
+            rm -rf /var/lib/apt/lists/*
         
         EXPOSE 80 443
         VOLUME ["/config", "/usr/share/jitsi-meet/transcripts"]
         EOF
     
-    - name: Copy rootfs
-      run: cp -r rootfs docker-build/
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: docker-build
         push: true
-        tags: |
-          atheniaai/meet:latest
-          atheniaai/meet:1.0.1
+        tags: atheniaai/meet:latest
